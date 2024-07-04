@@ -1,10 +1,12 @@
 name: Build and Push Docker Image
 
 on:
-  workflow_dispatch:
-
+  push:
+    branches:
+      - createLabel
+      
 jobs:
-  build-and-push:
+  build:
     runs-on: ubuntu-latest
     steps:
       - name: Check out the repository
@@ -26,3 +28,9 @@ jobs:
           context: .
           push: true
           tags: quay.io/dlawton/kuadrant_operator:latest
+
+
+      - name: Run tests
+        run: npm test
+        
+
