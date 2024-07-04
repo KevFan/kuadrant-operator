@@ -25,4 +25,4 @@ jobs:
         with:
           context: .
           push: true
-          tags: quay.io/YOUR_QUAY_USERNAME/kuadrant_operator:latest
+          tags: quay.io/dlawton/kuadrant_operator
