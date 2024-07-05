@@ -7,7 +7,7 @@ on:
 jobs:
   build:
     runs-on: ubuntu-latest
-    if: contains(github.event.pull_request.labels.*.name, 'build-image')  
+    if: contains(github.event.pull_request.labels.*.name, 'image_build')  
     steps:
       - name: Check out the repository
         uses: actions/checkout@v3
