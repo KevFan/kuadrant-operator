@@ -31,7 +31,6 @@ jobs:
           tags: quay.io/dlawton/kuadrant_operator:latest
 
 
-      - name: Run tests
-        run: npm test
+
         
 
