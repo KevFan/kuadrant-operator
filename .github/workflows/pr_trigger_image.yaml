@@ -1,4 +1,4 @@
-name: Conditional Build and Push Image
+name: PR Conditional Build and Push Image
 
 on:
   pull_request_target:
