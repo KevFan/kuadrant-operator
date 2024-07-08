@@ -1,3 +1,4 @@
+[test]
 # Kuadrant Operator
 
 [![Code Style](https://github.com/Kuadrant/kuadrant-operator/actions/workflows/code-style.yaml/badge.svg)](https://github.com/Kuadrant/kuadrant-operator/actions/workflows/code-style.yaml)
