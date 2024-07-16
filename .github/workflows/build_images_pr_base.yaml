@@ -212,7 +212,7 @@ jobs:
   pr-conditional-build:
     name: PR Conditional Build and Push Image to remote repo
     runs-on: ubuntu-latest
-    if: ${{ github.event_name == 'pull_request_target' && contains(github.event.pull_request.labels.*.name, 'image_build') }}
+    if: ${{ github.event_name == 'pull_request_target' && contains(github.event.pull_request.labels.*.name, 'forked_image_approved') }}
     steps:
       - name: Check out the repository
         uses: actions/checkout@v3
