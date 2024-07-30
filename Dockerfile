@@ -16,7 +16,6 @@ COPY controllers/ controllers/
 COPY pkg/ pkg/
 
 # Set environment variables for cross-compilation
-#ARG TARGETPLATFORM
 ARG TARGETARCH
 
 # Build
