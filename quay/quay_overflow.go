@@ -11,8 +11,8 @@ import (
 )
 
 const (
-	repo        = "dlawton/kuadrant-operator"
-	baseURL     = "https://quay.io/api/v1/repository/"
+	repo    = "dlawton/kuadrant-operator"
+	baseURL = "https://quay.io/api/v1/repository/"
 )
 
 var (
@@ -34,8 +34,8 @@ func main() {
 
 	// Encode the robot credentials for Basic Auth
 	auth := base64.StdEncoding.EncodeToString([]byte(robotUser + ":" + robotPass))
-	
-	// Create the request
+
+	// Create the request to get tags
 	req, err := http.NewRequest("GET", baseURL+repo+"/tag", nil)
 	if err != nil {
 		fmt.Println("Error creating request:", err)
@@ -84,14 +84,40 @@ func main() {
 			continue
 		}
 
-		// Filter out tags older than three weeks
-		if lastModified.After(threeWeeksAgo) {
+		// Delete tags older than three weeks
+		if lastModified.Before(threeWeeksAgo) {
+			deleteTag(client, auth, tag.Name)
+		} else {
 			uniqueTags[tag.Name] = struct{}{}
 		}
 	}
 
-	// Print filtered tags
+	// Print remaining tags
 	for tag := range uniqueTags {
 		fmt.Println(tag)
+	}
+}
+
+// deleteTag sends a DELETE request to remove the specified tag from the repository
+func deleteTag(client *http.Client, auth, tagName string) {
+	req, err := http.NewRequest("DELETE", baseURL+repo+"/tag/"+tagName, nil)
+	if err != nil {
+		fmt.Println("Error creating DELETE request:", err)
+		return
+	}
+	req.Header.Add("Authorization", "Basic "+auth)
+
+	resp, err := client.Do(req)
+	if err != nil {
+		fmt.Println("Error deleting tag:", err)
+		return
+	}
+	defer resp.Body.Close()
+
+	if resp.StatusCode == http.StatusNoContent {
+		fmt.Printf("Successfully deleted tag: %s\n", tagName)
+	} else {
+		body, _ := io.ReadAll(resp.Body)
+		fmt.Printf("Failed to delete tag %s: Status code %d\nBody: %s\n", tagName, resp.StatusCode, string(body))
 	}
 }
