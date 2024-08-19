@@ -7,6 +7,7 @@ import (
 	"io"
 	"net/http"
 	"os"
+	"strings"
 	"time"
 )
 
@@ -19,7 +20,10 @@ var (
 	robotPass   = os.Getenv("ROBOT_PASS")
 	robotUser   = os.Getenv("ROBOT_USER")
 	accessToken = os.Getenv("ACCESS_TOKEN")
+	preserveSubstring = "danlaw345"
 )
+
+
 
 type Tag struct {
 	Name         string `json:"name"`
@@ -78,7 +82,7 @@ func main() {
 	}
 
 	// Calculate the cutoff date for three weeks ago
-	threeWeeksAgo := time.Now().AddDate(0, 1, 0)
+	cutOffTime := time.Now().AddDate(0, 1, 0)
 
 	// Use a map to store unique tags (filter out duplicates)
 	uniqueTags := make(map[string]struct{})
@@ -90,12 +94,12 @@ func main() {
 			continue
 		}
 
-		// Delete tags older than three weeks
-		if lastModified.Before(threeWeeksAgo) {
-			deleteTag(client, tag.Name)
-		} else {
-			uniqueTags[tag.Name] = struct{}{}
-		}
+	// Delete tags older than three hours, unless they contain the preserve substring
+	if lastModified.Before(cutOffTime) && !containsSubstring(tag.Name, preserveSubstring) {
+		deleteTag(client, accessToken, tag.Name)
+	} else {
+		uniqueTags[tag.Name] = struct{}{}
+	}
 	}
 
 	// Print remaining tags
@@ -104,22 +108,18 @@ func main() {
 	}
 }
 
+func containsSubstring(tagName, substring string) bool {
+	return strings.Contains(tagName, substring)
+}
+
 // deleteTag sends a DELETE request to remove the specified tag from the repository
-func deleteTag(client *http.Client, tagName string) {
+func deleteTag(client *http.Client, accessToken, tagName string) {
 	req, err := http.NewRequest("DELETE", baseURL+repo+"/tag/"+tagName, nil)
 	if err != nil {
 		fmt.Println("Error creating DELETE request:", err)
 		return
 	}
-
-	// Prioritize Bearer token for authorization
-	if accessToken != "" {
-		req.Header.Add("Authorization", "Bearer "+accessToken)
-	} else {
-		// Fallback to Basic Authentication if no access token
-		auth := base64.StdEncoding.EncodeToString([]byte(robotUser + ":" + robotPass))
-		req.Header.Add("Authorization", "Basic "+auth)
-	}
+	req.Header.Add("Authorization", "Bearer "+accessToken)
 
 	resp, err := client.Do(req)
 	if err != nil {
@@ -134,4 +134,5 @@ func deleteTag(client *http.Client, tagName string) {
 		body, _ := io.ReadAll(resp.Body)
 		fmt.Printf("Failed to delete tag %s: Status code %d\nBody: %s\n", tagName, resp.StatusCode, string(body))
 	}
+	
 }
