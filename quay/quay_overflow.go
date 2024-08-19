@@ -11,13 +11,14 @@ import (
 )
 
 const (
-	repo    = "dlawton/kuadrant-operator"
+	repo    = "test_org_123/kuadrant-operator"
 	baseURL = "https://quay.io/api/v1/repository/"
 )
 
 var (
-	robotPass = os.Getenv("ROBOT_PASS")
-	robotUser = os.Getenv("ROBOT_USER")
+	robotPass   = os.Getenv("ROBOT_PASS")
+	robotUser   = os.Getenv("ROBOT_USER")
+	accessToken = os.Getenv("ACCESS_TOKEN")
 )
 
 type Tag struct {
@@ -32,16 +33,21 @@ type TagsResponse struct {
 func main() {
 	client := &http.Client{}
 
-	// Encode the robot credentials for Basic Auth
-	auth := base64.StdEncoding.EncodeToString([]byte(robotUser + ":" + robotPass))
-
 	// Create the request to get tags
 	req, err := http.NewRequest("GET", baseURL+repo+"/tag", nil)
 	if err != nil {
 		fmt.Println("Error creating request:", err)
 		return
 	}
-	req.Header.Add("Authorization", "Basic "+auth)
+
+	// Prioritize Bearer token for authorization
+	if accessToken != "" {
+		req.Header.Add("Authorization", "Bearer "+accessToken)
+	} else {
+		// Fallback to Basic Authentication if no access token
+		auth := base64.StdEncoding.EncodeToString([]byte(robotUser + ":" + robotPass))
+		req.Header.Add("Authorization", "Basic "+auth)
+	}
 
 	// Execute the request
 	resp, err := client.Do(req)
@@ -72,7 +78,7 @@ func main() {
 	}
 
 	// Calculate the cutoff date for three weeks ago
-	threeWeeksAgo := time.Now().AddDate(0, 0, -21)
+	threeWeeksAgo := time.Now().AddDate(0, 1, 0)
 
 	// Use a map to store unique tags (filter out duplicates)
 	uniqueTags := make(map[string]struct{})
@@ -86,7 +92,7 @@ func main() {
 
 		// Delete tags older than three weeks
 		if lastModified.Before(threeWeeksAgo) {
-			deleteTag(client, auth, tag.Name)
+			deleteTag(client, tag.Name)
 		} else {
 			uniqueTags[tag.Name] = struct{}{}
 		}
@@ -99,13 +105,21 @@ func main() {
 }
 
 // deleteTag sends a DELETE request to remove the specified tag from the repository
-func deleteTag(client *http.Client, auth, tagName string) {
+func deleteTag(client *http.Client, tagName string) {
 	req, err := http.NewRequest("DELETE", baseURL+repo+"/tag/"+tagName, nil)
 	if err != nil {
 		fmt.Println("Error creating DELETE request:", err)
 		return
 	}
-	req.Header.Add("Authorization", "Basic "+auth)
+
+	// Prioritize Bearer token for authorization
+	if accessToken != "" {
+		req.Header.Add("Authorization", "Bearer "+accessToken)
+	} else {
+		// Fallback to Basic Authentication if no access token
+		auth := base64.StdEncoding.EncodeToString([]byte(robotUser + ":" + robotPass))
+		req.Header.Add("Authorization", "Basic "+auth)
+	}
 
 	resp, err := client.Do(req)
 	if err != nil {
