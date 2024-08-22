@@ -17,13 +17,11 @@ const (
 )
 
 var (
-	robotPass   = os.Getenv("ROBOT_PASS")
-	robotUser   = os.Getenv("ROBOT_USER")
-	accessToken = os.Getenv("ACCESS_TOKEN")
-	preserveSubstring = "danlaw345"
+	robotPass          = os.Getenv("ROBOT_PASS")
+	robotUser          = os.Getenv("ROBOT_USER")
+	accessToken        = os.Getenv("ACCESS_TOKEN")
+	preserveSubstring  = "danlaw345"
 )
-
-
 
 type Tag struct {
 	Name         string `json:"name"`
@@ -81,11 +79,14 @@ func main() {
 		return
 	}
 
-	// Calculate the cutoff date for three weeks ago
-	cutOffTime := time.Now().AddDate(0, 1, 0)
+	// Calculate the cutoff time 
+	cutOffTime := time.Now().AddDate(0, 0, 0).Add(0 * time.Hour).Add(-1 * time.Minute)
 
-	// Use a map to store unique tags (filter out duplicates)
-	uniqueTags := make(map[string]struct{})
+	// Maps to track tags
+	tagsToDelete := make(map[string]struct{})
+	remainingTags := make(map[string]struct{})
+
+	// Populate tagsToDelete and remainingTags
 	for _, tag := range tagsResp.Tags {
 		// Parse the LastModified timestamp
 		lastModified, err := time.Parse(time.RFC1123, tag.LastModified)
@@ -94,16 +95,24 @@ func main() {
 			continue
 		}
 
-	// Delete tags older than three hours, unless they contain the preserve substring
-	if lastModified.Before(cutOffTime) && !containsSubstring(tag.Name, preserveSubstring) {
-		deleteTag(client, accessToken, tag.Name)
-	} else {
-		uniqueTags[tag.Name] = struct{}{}
+		// Check if tag should be deleted
+		if lastModified.Before(cutOffTime) && !containsSubstring(tag.Name, preserveSubstring) {
+			tagsToDelete[tag.Name] = struct{}{}
+		} else {
+			remainingTags[tag.Name] = struct{}{}
+		}
 	}
+
+	// Delete tags and update remainingTags
+	for tagName := range tagsToDelete {
+		if deleteTag(client, accessToken, tagName) {
+			delete(remainingTags, tagName) // Remove deleted tag from remainingTags
+		}
 	}
 
 	// Print remaining tags
-	for tag := range uniqueTags {
+	fmt.Println("Remaining tags:")
+	for tag := range remainingTags {
 		fmt.Println(tag)
 	}
 }
@@ -113,26 +122,28 @@ func containsSubstring(tagName, substring string) bool {
 }
 
 // deleteTag sends a DELETE request to remove the specified tag from the repository
-func deleteTag(client *http.Client, accessToken, tagName string) {
+// Returns true if successful, false otherwise
+func deleteTag(client *http.Client, accessToken, tagName string) bool {
 	req, err := http.NewRequest("DELETE", baseURL+repo+"/tag/"+tagName, nil)
 	if err != nil {
 		fmt.Println("Error creating DELETE request:", err)
-		return
+		return false
 	}
 	req.Header.Add("Authorization", "Bearer "+accessToken)
 
 	resp, err := client.Do(req)
 	if err != nil {
 		fmt.Println("Error deleting tag:", err)
-		return
+		return false
 	}
 	defer resp.Body.Close()
 
 	if resp.StatusCode == http.StatusNoContent {
 		fmt.Printf("Successfully deleted tag: %s\n", tagName)
+		return true
 	} else {
 		body, _ := io.ReadAll(resp.Body)
 		fmt.Printf("Failed to delete tag %s: Status code %d\nBody: %s\n", tagName, resp.StatusCode, string(body))
+		return false
 	}
-	
 }
