@@ -17,110 +17,119 @@ const (
 )
 
 var (
-	robotPass          = os.Getenv("ROBOT_PASS")
-	robotUser          = os.Getenv("ROBOT_USER")
-	accessToken        = os.Getenv("ACCESS_TOKEN")
-	preserveSubstring  = "danlaw345"
+	robotPass         = os.Getenv("ROBOT_PASS")
+	robotUser         = os.Getenv("ROBOT_USER")
+	accessToken       = os.Getenv("ACCESS_TOKEN")
+	preserveSubstring = "danlaw345" // Example Tag name that wont be deleted i.e relevant tags
 )
 
+// Tag represents a tag in the repository.
 type Tag struct {
 	Name         string `json:"name"`
 	LastModified string `json:"last_modified"`
 }
 
+// TagsResponse represents the structure of the API response that contains tags.
 type TagsResponse struct {
 	Tags []Tag `json:"tags"`
 }
 
 func main() {
-    client := &http.Client{}
+	client := &http.Client{}
 
-    // Create the request to get tags
-    req, err := http.NewRequest("GET", baseURL+repo+"/tag", nil)
-    if err != nil {
-        fmt.Println("Error creating request:", err)
-        return
-    }
+	// Fetch tags from the API
+	tags, err := fetchTags(client)
+	if err != nil {
+		fmt.Println("Error fetching tags:", err)
+		return
+	}
 
-    // Prioritize Bearer token for authorization
-    if accessToken != "" {
-        req.Header.Add("Authorization", "Bearer "+accessToken)
-    } else {
-        // Fallback to Basic Authentication if no access token
-        auth := base64.StdEncoding.EncodeToString([]byte(robotUser + ":" + robotPass))
-        req.Header.Add("Authorization", "Basic "+auth)
-    }
+	// Use filterTags to get tags to delete and remaining tags
+	tagsToDelete, remainingTags := filterTags(tags, preserveSubstring)
 
-    // Execute the request
-    resp, err := client.Do(req)
-    if err != nil {
-        fmt.Println("Error making request:", err)
-        return
-    }
-    defer resp.Body.Close()
+	// Delete tags and update remainingTags
+	for tagName := range tagsToDelete {
+		if deleteTag(client, accessToken, tagName) {
+			delete(remainingTags, tagName) // Remove deleted tag from remainingTags
+		}
+	}
 
-    // Read the response body
-    body, err := io.ReadAll(resp.Body)
-    if err != nil {
-        fmt.Println("Error reading response body:", err)
-        return
-    }
-
-    // Handle possible non-200 status codes
-    if resp.StatusCode != http.StatusOK {
-        fmt.Printf("Error: received status code %d\nBody: %s\n", resp.StatusCode, string(body))
-        return
-    }
-
-    // Parse the JSON response
-    var tagsResp TagsResponse
-    if err := json.Unmarshal(body, &tagsResp); err != nil {
-        fmt.Println("Error unmarshalling response:", err)
-        return
-    }
-
-    // Use FilterTags to get tags to delete and remaining tags
-    tagsToDelete, remainingTags := FilterTags(tagsResp.Tags, preserveSubstring)
-
-    // Delete tags and update remainingTags
-    for tagName := range tagsToDelete {
-        if deleteTag(client, accessToken, tagName) {
-            delete(remainingTags, tagName) // Remove deleted tag from remainingTags
-        }
-    }
-
-    // Print remaining tags
-    fmt.Println("Remaining tags:")
-    for tag := range remainingTags {
-        fmt.Println(tag)
-    }
+	// Print remaining tags
+	fmt.Println("Remaining tags:")
+	for tag := range remainingTags {
+		fmt.Println(tag)
+	}
 }
 
-// FilterTags takes a slice of tags and returns two maps: one for tags to delete and one for remaining tags.
-func FilterTags(tags []Tag, preserveSubstring string) (map[string]struct{}, map[string]struct{}) {
-    // Calculate the cutoff time
-    cutOffTime := time.Now().AddDate(0, 0, 0).Add(0 * time.Hour).Add(-1 * time.Minute)
+// fetchTags retrieves the tags from the repository using the Quay.io API.
+func fetchTags(client *http.Client) ([]Tag, error) {
+	req, err := http.NewRequest("GET", baseURL+repo+"/tag", nil)
+	if err != nil {
+		return nil, fmt.Errorf("error creating request: %w", err)
+	}
 
-    tagsToDelete := make(map[string]struct{})
-    remainingTags := make(map[string]struct{})
+	// Prioritize Bearer token for authorization
+	if accessToken != "" {
+		req.Header.Add("Authorization", "Bearer "+accessToken)
+	} else {
+		// Fallback to Basic Authentication if no access token
+		auth := base64.StdEncoding.EncodeToString([]byte(robotUser + ":" + robotPass))
+		req.Header.Add("Authorization", "Basic "+auth)
+	}
 
-    for _, tag := range tags {
-        // Parse the LastModified timestamp
-        lastModified, err := time.Parse(time.RFC1123, tag.LastModified)
-        if err != nil {
-            fmt.Println("Error parsing time:", err)
-            continue
-        }
+	// Execute the request
+	resp, err := client.Do(req)
+	if err != nil {
+		return nil, fmt.Errorf("error making request: %w", err)
+	}
+	defer resp.Body.Close()
 
-        // Check if tag should be deleted
-        if lastModified.Before(cutOffTime) && !containsSubstring(tag.Name, preserveSubstring) {
-            tagsToDelete[tag.Name] = struct{}{}
-        } else {
-            remainingTags[tag.Name] = struct{}{}
-        }
-    }
+	// Handle possible non-200 status codes
+	if resp.StatusCode != http.StatusOK {
+		body, _ := io.ReadAll(resp.Body)
+		return nil, fmt.Errorf("error: received status code %d\nBody: %s", resp.StatusCode, string(body))
+	}
 
-    return tagsToDelete, remainingTags
+	// Read the response body
+	body, err := io.ReadAll(resp.Body)
+	if err != nil {
+		return nil, fmt.Errorf("error reading response body: %w", err)
+	}
+
+	// Parse the JSON response
+	var tagsResp TagsResponse
+	if err := json.Unmarshal(body, &tagsResp); err != nil {
+		return nil, fmt.Errorf("error unmarshalling response: %w", err)
+	}
+
+	return tagsResp.Tags, nil
+}
+
+// filterTags takes a slice of tags and returns two maps: one for tags to delete and one for remaining tags.
+func filterTags(tags []Tag, preserveSubstring string) (map[string]struct{}, map[string]struct{}) {
+	// Calculate the cutoff time
+	cutOffTime := time.Now().AddDate(0, 0, 0).Add(0 * time.Hour).Add(-1 * time.Minute)
+
+	tagsToDelete := make(map[string]struct{})
+	remainingTags := make(map[string]struct{})
+
+	for _, tag := range tags {
+		// Parse the LastModified timestamp
+		lastModified, err := time.Parse(time.RFC1123, tag.LastModified)
+		if err != nil {
+			fmt.Println("Error parsing time:", err)
+			continue
+		}
+
+		// Check if tag should be deleted
+		if lastModified.Before(cutOffTime) && !containsSubstring(tag.Name, preserveSubstring) {
+			tagsToDelete[tag.Name] = struct{}{}
+		} else {
+			remainingTags[tag.Name] = struct{}{}
+		}
+	}
+
+	return tagsToDelete, remainingTags
 }
 
 func containsSubstring(tagName, substring string) bool {
