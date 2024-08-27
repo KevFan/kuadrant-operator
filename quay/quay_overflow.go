@@ -9,6 +9,8 @@ import (
 	"os"
 	"strings"
 	"time"
+
+	"k8s.io/client-go/rest"
 )
 
 const (
@@ -62,7 +64,9 @@ func main() {
 }
 
 // fetchTags retrieves the tags from the repository using the Quay.io API.
-func fetchTags(client *http.Client) ([]Tag, error) {
+func fetchTags(client rest.HTTPClient) ([]Tag, error) {
+	// TODO - DO you want to seperate out builidng the request to a function to unit test?
+	// TODO - Is adding the headers even needed to fetch tags for a public repo?
 	req, err := http.NewRequest("GET", baseURL+repo+"/tag", nil)
 	if err != nil {
 		return nil, fmt.Errorf("error creating request: %w", err)
