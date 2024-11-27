@@ -18,6 +18,7 @@ import (
 const (
 	KuadrantAppName                = "kuadrant"
 	PolicyAffectedConditionPattern = "kuadrant.io/%sAffected" // Policy kinds are expected to be named XPolicy
+	FieldManager                   = "kuadrant-operator"
 )
 
 var (
@@ -29,7 +30,7 @@ func CommonLabels() map[string]string {
 	return map[string]string{
 		AppLabelKey:                    AppLabelValue,
 		"app.kubernetes.io/component":  KuadrantAppName,
-		"app.kubernetes.io/managed-by": "kuadrant-operator",
+		"app.kubernetes.io/managed-by": FieldManager,
 		"app.kubernetes.io/instance":   KuadrantAppName,
 		"app.kubernetes.io/name":       KuadrantAppName,
 		"app.kubernetes.io/part-of":    KuadrantAppName,

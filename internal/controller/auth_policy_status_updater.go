@@ -101,13 +101,15 @@ func (r *AuthPolicyStatusUpdater) UpdateStatus(ctx context.Context, _ []controll
 		newStatus.ObservedGeneration = policy.Generation
 		policy.Status = *newStatus
 
+		// TODO: Managed field cannot be set when applying
+		policy.ManagedFields = nil
 		obj, err := controller.Destruct(policy)
 		if err != nil {
 			logger.Error(err, "unable to destruct policy") // should never happen
 			continue
 		}
 
-		_, err = r.client.Resource(kuadrantv1.AuthPoliciesResource).Namespace(policy.GetNamespace()).UpdateStatus(ctx, obj, metav1.UpdateOptions{})
+		_, err = r.client.Resource(kuadrantv1.AuthPoliciesResource).Namespace(policy.GetNamespace()).ApplyStatus(ctx, obj.GetName(), obj, metav1.ApplyOptions{FieldManager: FieldManager})
 		if err != nil {
 			if strings.Contains(err.Error(), "StorageError: invalid object") {
 				logger.Info("possible error updating resource", "err", err, "possible_cause", "resource has being removed from the cluster already")
