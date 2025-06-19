@@ -49,7 +49,6 @@ func (r *LimitadorLimitsReconciler) Reconcile(ctx context.Context, _ []controlle
 		logger.V(1).Info("not limitador resources found in topology")
 		return nil
 	}
-	limitador.ManagedFields = nil
 
 	desiredLimits, err := r.buildLimitadorLimits(ctx, state)
 	if err != nil {
